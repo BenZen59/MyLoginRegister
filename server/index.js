@@ -4,6 +4,10 @@ const mysql2 = require('mysql2');
 const app = express();
 const cors = require('cors');
 
+const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
+const session = require('express-session');
+
 const bcrypt = require('bcrypt');
 
 const saltRounds = 10;
@@ -12,8 +16,29 @@ require('dotenv').config();
 
 const { DB_HOST, DB_USER, DB_PASSWORD, DB_SCHEMA } = process.env;
 
-app.use(cors());
 app.use(express.json());
+app.use(
+  cors({
+    origin: ['http://localhost:3000'],
+    methods: ['GET', 'POST'],
+    credentials: true,
+  })
+);
+
+app.use(cookieParser());
+app.use(bodyParser.urlencoded({ extended: true }));
+
+app.use(
+  session({
+    key: 'userId',
+    secret: 'subscribe',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      expires: 60 * 60 * 24,
+    },
+  })
+);
 const db = mysql2.createConnection({
   user: DB_USER,
   host: DB_HOST,
@@ -35,6 +60,14 @@ app.post('/register', (req, res) => {
   });
 });
 
+app.get('/login', (req, res) => {
+  if (req.session.user) {
+    res.send({ loggedIn: true, user: req.session.user });
+  } else {
+    res.send({ loggedIn: false });
+  }
+});
+
 app.post('/login', (req, res) => {
   const { username } = req.body;
   const { password } = req.body;
@@ -47,6 +80,7 @@ app.post('/login', (req, res) => {
       } else if (result.length > 0) {
         bcrypt.compare(password, result[0].password, (error, response) => {
           if (response) {
+            req.session.user = result;
             res.send(result);
           } else {
             res.send({ message: 'Wrong username/password combination' });
