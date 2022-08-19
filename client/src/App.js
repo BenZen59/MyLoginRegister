@@ -1,5 +1,5 @@
 import './App.css';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Axios from 'axios';
 
 function App() {
@@ -10,6 +10,8 @@ function App() {
   const [password, setPassword] = useState('');
 
   const [loginStatus, setLoginStatus] = useState('');
+
+  Axios.defaults.withCredentials = true;
 
   const register = () => {
     Axios.post('http://localhost:3001/register', {
@@ -32,6 +34,14 @@ function App() {
       }
     });
   };
+
+  useEffect(() => {
+    Axios.get('http://localhost:3001/login').then((response) => {
+      if (response.data.loggedIn === true) {
+        setLoginStatus(response.data.user[0].username);
+      }
+    });
+  }, []);
 
   return (
     <div className='App'>
