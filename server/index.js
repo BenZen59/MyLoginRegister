@@ -12,6 +12,8 @@ const bcrypt = require('bcrypt');
 
 const saltRounds = 10;
 
+const jwt = require('jsonwebtoken');
+
 require('dotenv').config();
 
 const { DB_HOST, DB_USER, DB_PASSWORD, DB_SCHEMA } = process.env;
@@ -60,6 +62,26 @@ app.post('/register', (req, res) => {
   });
 });
 
+const verifyJWT = (req, res, next) => {
+  const token = req.headers['x-access-token'];
+  if (!token) {
+    res.send('Yo, we need a token, please give it to us next time!');
+  } else {
+    jwt.verify(token, 'jwtSecret', (err, decoded) => {
+      if (err) {
+        res.json({ auth: false, message: 'You failed to authentificate' });
+      } else {
+        req.userId = decoded.id;
+        next();
+      }
+    });
+  }
+};
+
+app.get('/isUserAuth', verifyJWT, (req, res) => {
+  res.send('Yo, you are authenticated Congrats!');
+});
+
 app.get('/login', (req, res) => {
   if (req.session.user) {
     res.send({ loggedIn: true, user: req.session.user });
@@ -80,14 +102,21 @@ app.post('/login', (req, res) => {
       } else if (result.length > 0) {
         bcrypt.compare(password, result[0].password, (error, response) => {
           if (response) {
+            const { id } = result[0].id;
+            const token = jwt.sign({ id }, 'jwtSecret', {
+              expiresIn: 300,
+            });
             req.session.user = result;
-            res.send(result);
+            res.json({ auth: true, token, result });
           } else {
-            res.send({ message: 'Wrong username/password combination' });
+            res.json({
+              auth: false,
+              message: 'Wrong username/password combination',
+            });
           }
         });
       } else {
-        res.send({ message: "User doesn't exist" });
+        res.json({ auth: false, message: 'No user exists' });
       }
     }
   );
